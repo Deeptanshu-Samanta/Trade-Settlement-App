@@ -1,21 +1,203 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NSE Trade Demo</title><style>
-:root{font-family:Inter,Arial,sans-serif;color:#e9efff;background:#0d1425}body{max-width:1180px;margin:0 auto;padding:28px}h1{margin:0;color:#69dbff}.sub{color:#99a8c7}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:#151f36;border:1px solid #273755;border-radius:12px;padding:18px;margin:16px 0}input,select,button{box-sizing:border-box;width:100%;margin:5px 0;padding:10px;border-radius:7px;border:1px solid #3b4e75;background:#0d1425;color:#fff}button{background:#2677d7;border:0;font-weight:700;cursor:pointer}button:hover{background:#3c8cec}.sell{background:#c54b5b}table{width:100%;border-collapse:collapse}td,th{padding:9px;text-align:left;border-bottom:1px solid #293958}.hidden{display:none}.notice{min-height:20px;color:#ffd166}.good{color:#7fe3a3}.price{color:#7fe3a3;font-weight:bold}
-</style></head><body><h1>NSE Trade Demo</h1><p class="sub">A local-paper trading workspace for the seeded NSE securities.</p><p id="notice" class="notice"></p>
-<section id="access" class="grid"><form class="card" id="login"><h2>Sign in</h2><input name="email" type="email" placeholder="Email" required><input name="password" type="password" placeholder="Password" required><button>Login</button></form><form class="card" id="register"><h2>Create account</h2><input name="name" placeholder="Full name" required><input name="email" type="email" placeholder="Email" required><input name="dob" type="date" required><input name="phone" placeholder="10-digit phone" required><input name="password" type="password" placeholder="Password (8+ characters)" minlength="8" required><button>Create account</button></form></section>
-<section id="dashboard" class="hidden"><div class="card"><span id="who"></span> <button style="width:auto;float:right" onclick="logout()">Logout</button><h2 id="balance">Cash balance: ₹0.00</h2></div><div class="grid"><form class="card" id="bank"><h2>Link bank account</h2><input name="bank_name" placeholder="Bank name" required><input name="account_no" placeholder="Account number" required><input name="ifsc_code" placeholder="IFSC code" required><button>Link bank</button><div id="banks"></div></form><form class="card" id="deposit"><h2>Add paper funds</h2><input name="amount" type="number" min="1" step="0.01" placeholder="Amount (₹)" required><input name="description" placeholder="Optional note"><button>Deposit</button><small class="sub">Demo credit only — no real bank transaction is made.</small></form></div><form class="card" id="trade"><h2>Place an order</h2><select id="security" name="security_id"></select><input id="price" name="price" type="number" min=".01" step=".01" required><input name="quantity" type="number" min="1" step="1" placeholder="Quantity" required><select name="order_type"><option value="BUY">Buy</option><option value="SELL">Sell</option></select><button>Place and settle trade</button><small class="sub">Trades execute at the displayed demo quote and settle immediately.</small></form><div class="grid"><div class="card"><h2>Holdings</h2><table><thead><tr><th>Symbol</th><th>Qty</th><th>Avg price</th></tr></thead><tbody id="holdings"></tbody></table></div><div class="card"><h2>Orders</h2><table><thead><tr><th>Side</th><th>Qty</th><th>Price</th><th>Status</th></tr></thead><tbody id="orders"></tbody></table></div></div></section>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TradeDesk India</title>
+<style>
+:root{color-scheme:dark;--panel:#111722;--line:#263246;--muted:#8c9ab4;--text:#eef4ff;--green:#00c076;--red:#ff5b6e;--amber:#f2b84b;--blue:#4aa8ff;--shadow:0 18px 70px rgba(0,0,0,.32);font-family:Inter,Segoe UI,Arial,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(180deg,#0b1018 0%,#07090e 100%);color:var(--text)}
+button,input,select{font:inherit}
+button{cursor:pointer}
+.app-shell{min-height:100vh}
+.topbar{height:64px;display:flex;align-items:center;gap:18px;padding:0 22px;border-bottom:1px solid var(--line);background:rgba(12,17,25,.96);position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;white-space:nowrap}
+.mark{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,var(--green),var(--blue));display:grid;place-items:center;color:#03100b;font-weight:900}
+.ticker{display:flex;gap:8px;overflow:hidden;flex:1}
+.ticker span{display:inline-flex;align-items:center;gap:8px;min-width:max-content;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:#0b111b;color:var(--muted);font-size:13px}
+.ticker b{color:var(--text)}
+.status{color:var(--green);font-size:13px;white-space:nowrap}
+.notice{min-height:22px;padding:0 22px;color:var(--amber);font-size:14px;display:flex;align-items:center}
+.notice.good{color:var(--green)}
+.hidden{display:none!important}
+.access{width:min(1040px,calc(100% - 32px));margin:48px auto;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.card,.panel{background:linear-gradient(180deg,var(--panel) 0%,#0e1420 100%);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow)}
+.card{padding:22px}
+.card h2,.panel h2{margin:0 0 14px;font-size:18px}
+.sub{color:var(--muted);font-size:13px;line-height:1.45}
+input,select{width:100%;margin:6px 0 10px;padding:11px 12px;border-radius:7px;border:1px solid #334057;background:#090f18;color:var(--text);outline:none}
+input:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(74,168,255,.12)}
+button{width:100%;border:0;border-radius:7px;padding:11px 12px;background:var(--blue);color:#04101f;font-weight:800}
+button:hover{filter:brightness(1.08)}
+.ghost{width:auto;background:#172234;color:var(--text);border:1px solid var(--line);padding:9px 12px}
+.search-strip{display:grid;grid-template-columns:minmax(280px,780px) auto;gap:14px;align-items:start;padding:12px 18px 0}
+.search-box{position:relative;max-width:780px}
+.search-box input{height:44px;margin:0;padding-left:42px;background:#0b111b}
+.search-box:before{content:"⌕";position:absolute;left:15px;top:9px;color:var(--muted);font-size:20px;z-index:1}
+.search-results{position:absolute;left:0;right:0;top:50px;z-index:10;background:#0d1420;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);overflow:hidden}
+.search-result{display:grid;grid-template-columns:1fr auto;gap:12px;width:100%;padding:10px 12px;border-radius:0;border-bottom:1px solid rgba(38,50,70,.7);background:transparent;color:var(--text);text-align:left}
+.search-result:hover{background:#172131}
+.page-nav{display:flex;gap:8px;justify-content:flex-end}
+.page-nav button{width:auto;background:#101825;color:var(--muted);border:1px solid var(--line);padding:11px 13px}
+.page-nav button.active{background:#1e3551;color:#fff;border-color:#3b75a9}
+.dashboard{display:grid;grid-template-columns:300px minmax(360px,1fr) 320px;gap:14px;padding:14px 18px 22px;min-height:calc(100vh - 142px)}
+.page{padding:14px 18px 22px}
+.page-grid{display:grid;grid-template-columns:minmax(280px,420px) minmax(360px,1fr);gap:14px}
+.execution-tools{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;align-items:end}
+.execution-table{overflow:auto}
+.panel{min-width:0;overflow:hidden}
+.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 15px;border-bottom:1px solid var(--line)}
+.panel-body{padding:14px 15px}
+.market-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.metric{border:1px solid var(--line);background:#0c121d;border-radius:8px;padding:12px;min-height:78px}
+.label{color:var(--muted);font-size:12px}
+.value{font-size:20px;font-weight:850;margin-top:8px}
+.up{color:var(--green)}
+.down{color:var(--red)}
+.chart-card{height:360px;display:grid;grid-template-rows:auto 1fr auto}
+.chart-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 15px;border-bottom:1px solid var(--line)}
+.symbol-title{font-size:24px;font-weight:900}
+.company-title{color:var(--muted);font-size:13px;margin-top:3px}
+.range{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.range button{width:auto;padding:7px 9px;background:#101825;color:var(--muted);border:1px solid var(--line)}
+.range button.active{background:#1e3551;color:#fff;border-color:#3b75a9}
+.chart-scroll{overflow-x:auto;overflow-y:hidden;padding:8px 12px 0}
+.chart-scroll::-webkit-scrollbar{height:10px}
+.chart-scroll::-webkit-scrollbar-track{background:#0a1019}
+.chart-scroll::-webkit-scrollbar-thumb{background:#334057;border-radius:999px}
+.chart-canvas-space{height:100%;min-width:720px}
+#priceChart{height:100%;display:block}
+.chart-meta{display:flex;justify-content:space-between;gap:12px;color:var(--muted);font-size:12px;padding:0 15px 13px}
+.right-stack{display:grid;gap:14px;align-content:start}
+.account-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+#who{color:var(--muted);font-size:13px}
+#balance{font-size:22px;font-weight:900;margin:8px 0 0}
+.order-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.order-actions button{background:#12291f;color:var(--green);border:1px solid rgba(0,192,118,.35)}
+.order-actions button.active:last-child{background:#351923;color:#fff;border-color:rgba(255,91,110,.5)}
+.order-actions button.active:first-child{background:#103524;color:#fff}
+.compact table,.holdings-list table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:9px 8px;text-align:left;border-bottom:1px solid rgba(38,50,70,.72);white-space:nowrap}
+th{color:var(--muted);font-weight:700}
+.holding-card{display:grid;gap:4px;padding:12px 15px;border-bottom:1px solid rgba(38,50,70,.72);background:#0c121d}
+.holding-card button{background:transparent;color:var(--text);padding:0;text-align:left}
+.holding-top{display:flex;justify-content:space-between;gap:10px;font-weight:850}
+.holding-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;color:var(--muted);font-size:12px}
+.empty{color:var(--muted);padding:14px 15px}
+@media (max-width:1120px){.dashboard{grid-template-columns:260px 1fr}.right-stack{grid-column:1 / -1;grid-template-columns:repeat(3,minmax(0,1fr))}.market-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:1120px){.execution-tools{grid-template-columns:repeat(2,minmax(150px,1fr))}.page-grid{grid-template-columns:1fr}}
+@media (max-width:780px){.topbar{height:auto;align-items:flex-start;flex-direction:column;padding:14px}.ticker{width:100%}.access,.dashboard{grid-template-columns:1fr;width:auto;margin:0;padding:14px}.right-stack{grid-template-columns:1fr}.chart-card{height:330px}.market-grid{grid-template-columns:1fr 1fr}.status{display:none}.search-strip{grid-template-columns:1fr;padding:12px 14px 0}.page-nav{justify-content:flex-start;overflow:auto}.page{padding:14px}.execution-tools{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app-shell">
+<header class="topbar"><div class="brand"><div class="mark">₹</div><span>TradeDesk India</span></div><div class="ticker" id="ticker"></div><div class="status">NSE demo market open</div></header>
+<p id="notice" class="notice"></p>
+
+<section id="access" class="access">
+<form class="card" id="login"><h2>Sign in</h2><p class="sub">Use your existing paper-trading account to open the market dashboard.</p><input name="email" type="email" placeholder="Email" required><input name="password" type="password" placeholder="Password" required><button>Login</button></form>
+<form class="card" id="register"><h2>Create account</h2><input name="name" placeholder="Full name" required><input name="email" type="email" placeholder="Email" required><input name="dob" type="date" required><input name="phone" placeholder="10-digit phone" required><input name="password" type="password" placeholder="Password (8+ characters)" minlength="8" required><button>Create account</button></form>
+</section>
+
+<section id="searchStrip" class="search-strip hidden">
+<div class="search-box"><input id="stockSearch" placeholder="Search Indian stocks by name or symbol"><div id="searchResults" class="search-results hidden"></div></div>
+<nav class="page-nav">
+<button type="button" id="tradePageBtn" class="active">Trading</button>
+<button type="button" id="fundsPageBtn">Bank & Funds</button>
+<button type="button" id="executionsPageBtn">Executions</button>
+</nav>
+</section>
+
+<section id="dashboard" class="dashboard hidden">
+<aside class="panel">
+<div class="panel-head"><h2>Holdings</h2><span class="sub" id="holdingCount"></span></div>
+<div id="holdings" class="holdings-list"></div>
+</aside>
+
+<main>
+<div class="market-grid"><div class="metric"><div class="label">Selected price</div><div class="value" id="selectedPrice">₹0.00</div></div><div class="metric"><div class="label">Day change</div><div class="value" id="selectedChange">0.00%</div></div><div class="metric"><div class="label">Volume</div><div class="value" id="selectedVolume">0</div></div><div class="metric"><div class="label">Range</div><div class="value" id="selectedRange">₹0 - ₹0</div></div></div>
+<section class="panel chart-card"><div class="chart-title"><div><div class="symbol-title" id="chartSymbol">NSE</div><div class="company-title" id="chartCompany">Select a stock</div></div><div class="range" id="rangeButtons"><button data-days="30">1M</button><button data-days="90" class="active">3M</button><button data-days="180">6M</button><button data-days="365">1Y</button></div></div><div class="chart-scroll" id="chartScroll"><div class="chart-canvas-space" id="chartSpace"><canvas id="priceChart"></canvas></div></div><div class="chart-meta"><span>Scroll sideways to inspect older candles</span><span id="chartLast"></span></div></section>
+</main>
+
+<aside class="right-stack">
+<section class="panel"><div class="panel-body"><div class="account-head"><div><div id="who"></div><div id="balance">Cash balance: ₹0.00</div></div><button class="ghost" onclick="logout()">Logout</button></div></div></section>
+<form class="panel panel-body" id="trade"><h2>Place Order</h2><select id="security" name="security_id"></select><input id="price" name="price" type="number" min=".01" step=".01" required><input name="quantity" type="number" min="1" step="1" placeholder="Quantity" required><input type="hidden" id="orderType" name="order_type" value="BUY"><div class="order-actions"><button type="button" id="buyBtn" class="active">Buy</button><button type="button" id="sellBtn">Sell</button></div><button style="margin-top:10px">Place and settle trade</button><p class="sub">Trades execute at the displayed demo quote and settle immediately.</p></form>
+<section class="panel compact"><div class="panel-head"><h2>Recent Orders</h2></div><div class="panel-body"><table><thead><tr><th>Side</th><th>Qty</th><th>Status</th></tr></thead><tbody id="orders"></tbody></table></div></section>
+</aside>
+</section>
+
+<section id="fundsPage" class="page hidden">
+<div class="page-grid">
+<form class="panel panel-body" id="bank"><h2>Bank Account</h2><p class="sub">Link a demo bank account for your paper-trading profile.</p><input name="bank_name" placeholder="Bank name" required><input name="account_no" placeholder="Account number" required><input name="ifsc_code" placeholder="IFSC code" required><button>Link bank</button><div id="banks"></div></form>
+<form class="panel panel-body" id="deposit"><h2>Add Paper Funds</h2><p class="sub">Demo credit only. No real bank transaction is made.</p><input name="amount" type="number" min="1" step="0.01" placeholder="Amount (₹)" required><input name="description" placeholder="Optional note"><button>Deposit</button></form>
+</div>
+</section>
+
+<section id="executionsPage" class="page hidden">
+<section class="panel">
+<div class="panel-head"><h2>Order Executions</h2><span class="sub" id="executionCount"></span></div>
+<div class="panel-body">
+<div class="execution-tools">
+<label class="sub">From date<input id="execFrom" type="date"></label>
+<label class="sub">To date<input id="execTo" type="date"></label>
+<label class="sub">Sort<select id="execSort"><option value="desc">Newest first</option><option value="asc">Oldest first</option></select></label>
+<button type="button" id="clearExecFilters" class="ghost">Clear filters</button>
+</div>
+</div>
+<div class="execution-table panel-body">
+<table><thead><tr><th>Date</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Settlement</th><th>Settled On</th></tr></thead><tbody id="executions"></tbody></table>
+</div>
+</section>
+</section>
+</div>
+
 <script>
-let token=localStorage.token||'', securities=[]; const $=id=>document.getElementById(id); const notice=(s,good=false)=>{let x=$('notice');x.textContent=s;x.className=good?'notice good':'notice'};
+let token=localStorage.token||'',securities=[],timeline=[],holdingsCache=[],ordersCache=[],executionsCache=[],selectedId=null,activeDays=90,currentPage='trade';
+const $=id=>document.getElementById(id);
+const STOCK_META={RELIANCE:'Reliance Industries',TCS:'Tata Consultancy Services',INFY:'Infosys',HDFCBANK:'HDFC Bank',ICICIBANK:'ICICI Bank',SBIN:'State Bank of India',ITC:'ITC',LT:'Larsen & Toubro',BHARTIARTL:'Bharti Airtel',HINDUNILVR:'Hindustan Unilever',AXISBANK:'Axis Bank',KOTAKBANK:'Kotak Mahindra Bank',MARUTI:'Maruti Suzuki India',TATAMOTORS:'Tata Motors',SUNPHARMA:'Sun Pharmaceutical',BAJFINANCE:'Bajaj Finance',ADANIENT:'Adani Enterprises',ONGC:'Oil and Natural Gas Corp',COALINDIA:'Coal India',POWERGRID:'Power Grid Corporation',NTPC:'NTPC',TITAN:'Titan Company',ULTRACEMCO:'UltraTech Cement',WIPRO:'Wipro',HCLTECH:'HCL Technologies'};
+const notice=(s,good=false)=>{let x=$('notice');x.textContent=s;x.className=good?'notice good':'notice'};
+const money=n=>'₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const compact=n=>Number(n).toLocaleString('en-IN',{maximumFractionDigits:0});
+const company=s=>STOCK_META[s.symbol]||s.symbol;
+const symbol=id=>(securities.find(s=>s.security_id===Number(id))||{}).symbol||'#'+id;
+const orderById=id=>ordersCache.find(o=>o.order_id===Number(id))||{};
+const dateOnly=s=>String(s||'').slice(0,10);
+const dateTime=s=>new Date(s).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});
 async function api(path,options={}){options.headers={...(options.headers||{}),...(token?{Authorization:'Bearer '+token}:{})};if(options.body&&typeof options.body!=='string'){options.headers['Content-Type']='application/json';options.body=JSON.stringify(options.body)}let r=await fetch(path,options);if(!r.ok){let x=await r.json().catch(()=>({}));throw Error(x.detail||'Request failed')}return r.status===204?null:r.json()}
-function money(n){return '₹'+Number(n).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2})} function symbol(id){return (securities.find(s=>s.security_id===id)||{}).symbol||'#'+id}
-async function refresh(){let [me,balance,banks,stocks,holds,orders]=await Promise.all([api('/users/me'),api('/cash/balance'),api('/banks'),api('/securities'),api('/holdings'),api('/orders')]);securities=stocks;$('who').textContent='Signed in as '+me.name;$('balance').textContent='Cash balance: '+money(balance.balance);$('banks').innerHTML=banks.length?'<p class="good">Linked: '+banks.map(b=>b.bank_name+' ••••'+b.account_no.slice(-4)).join('<br>')+'</p>':'<p class="notice">Link a bank account to complete setup.</p>';$('security').innerHTML=stocks.map(s=>`<option value="${s.security_id}" data-price="${s.last_price}">${s.symbol} — ${money(s.last_price)}</option>`).join('');$('price').value=stocks[0]?.last_price||'';$('holdings').innerHTML=holds.filter(h=>Number(h.quantity)>0).map(h=>`<tr><td>${symbol(h.security_id)}</td><td>${h.quantity}</td><td>${money(h.avg_price)}</td></tr>`).join('')||'<tr><td colspan="3">No holdings yet</td></tr>';$('orders').innerHTML=orders.slice(0,8).map(o=>`<tr><td>${o.order_type} ${symbol(o.security_id)}</td><td>${o.quantity}</td><td>${money(o.price)}</td><td>${o.status}</td></tr>`).join('')||'<tr><td colspan="4">No orders yet</td></tr>'}
-function showApp(){ $('access').classList.add('hidden');$('dashboard').classList.remove('hidden');refresh().catch(e=>notice(e.message)) } function logout(){localStorage.removeItem('token');token='';location.reload()}
+function enrich(s){let prev=Number(s.last_price)*(1+(((s.symbol.charCodeAt(0)%9)-4)/100));let change=(Number(s.last_price)-prev)/prev*100;return {...s,name:company(s),change}}
+function renderTicker(){$('ticker').innerHTML=securities.slice(0,8).map(enrich).map(s=>`<span><b>${s.symbol}</b> ${money(s.last_price)} <em class="${s.change>=0?'up':'down'}">${s.change>=0?'+':''}${s.change.toFixed(2)}%</em></span>`).join('')}
+function renderSearchResults(){let q=$('stockSearch').value.trim().toLowerCase();let box=$('searchResults');if(!q){box.classList.add('hidden');box.innerHTML='';return}let rows=securities.map(enrich).filter(s=>(s.symbol+' '+s.name).toLowerCase().includes(q)).slice(0,8);box.innerHTML=rows.map(s=>`<button class="search-result" data-id="${s.security_id}"><span><b>${s.symbol}</b><div class="sub">${s.name}</div></span><span class="${s.change>=0?'up':'down'}">${money(s.last_price)}<br>${s.change>=0?'+':''}${s.change.toFixed(2)}%</span></button>`).join('')||'<div class="empty">No matching Indian stocks</div>';box.classList.toggle('hidden',rows.length===0);document.querySelectorAll('.search-result').forEach(btn=>btn.onclick=()=>{selectStock(Number(btn.dataset.id));$('stockSearch').value='';box.classList.add('hidden')})}
+function renderHoldings(){let active=holdingsCache.filter(h=>Number(h.quantity)>0);$('holdingCount').textContent=active.length?`${active.length} active`:'';$('holdings').innerHTML=active.map(h=>{let s=securities.find(x=>x.security_id===h.security_id),last=s?Number(s.last_price):0,qty=Number(h.quantity),avg=Number(h.avg_price),value=last*qty,pnl=(last-avg)*qty;return `<div class="holding-card"><button type="button" onclick="selectStock(${h.security_id})"><div class="holding-top"><span>${symbol(h.security_id)}</span><span>${money(value)}</span></div><div class="holding-meta"><span>${company(s||{symbol:symbol(h.security_id)})}</span><span class="${pnl>=0?'up':'down'}">${pnl>=0?'+':''}${money(pnl)}</span><span>Qty ${qty}</span><span>Avg ${money(avg)}</span></div></button></div>`}).join('')||'<div class="empty">No holdings yet. Search a stock, add paper funds, and place a buy order.</div>'}
+function renderExecutions(){let from=$('execFrom').value,to=$('execTo').value,sort=$('execSort').value;let rows=executionsCache.filter(e=>(!from||dateOnly(e.execution_date)>=from)&&(!to||dateOnly(e.execution_date)<=to)).sort((a,b)=>sort==='asc'?new Date(a.execution_date)-new Date(b.execution_date):new Date(b.execution_date)-new Date(a.execution_date));$('executionCount').textContent=`${rows.length} shown`; $('executions').innerHTML=rows.map(e=>{let order=orderById(e.order_id);return `<tr><td>${dateTime(e.execution_date)}</td><td>${symbol(order.security_id)}</td><td class="${order.order_type==='BUY'?'up':'down'}">${order.order_type||'-'}</td><td>${Number(e.execution_qty).toLocaleString('en-IN')}</td><td>${money(e.execution_price)}</td><td>${e.settlement_status}</td><td>${e.settlement_date?dateTime(e.settlement_date):'-'}</td></tr>`}).join('')||'<tr><td colspan="7">No executions match the selected dates</td></tr>'}
+async function loadTimeline(){if(!selectedId)return;let data=await api(`/securities/${selectedId}/timeline?days=${activeDays}`);timeline=data.points;renderChart();renderStats()}
+function selectStock(id){selectedId=id;let s=securities.find(x=>x.security_id===id);if(!s)return;$('security').value=id;$('price').value=s.last_price;$('chartSymbol').textContent=s.symbol;$('chartCompany').textContent=company(s);loadTimeline().catch(e=>notice(e.message))}
+function renderStats(){let last=timeline[timeline.length-1],first=timeline[0];if(!last||!first)return;let prev=timeline[timeline.length-2]||first;let day=((last.close-prev.close)/prev.close)*100;$('selectedPrice').textContent=money(last.close);$('selectedChange').textContent=(day>=0?'+':'')+day.toFixed(2)+'%';$('selectedChange').className='value '+(day>=0?'up':'down');$('selectedVolume').textContent=compact(last.volume);$('selectedRange').textContent=money(Math.min(...timeline.map(p=>p.low)))+' - '+money(Math.max(...timeline.map(p=>p.high)));$('chartLast').textContent=`Last close ${money(last.close)} on ${last.date}`}
+function renderChart(){let canvas=$('priceChart'),scroll=$('chartScroll'),space=$('chartSpace'),dpr=window.devicePixelRatio||1,viewport=scroll.clientWidth,h=space.clientHeight;if(timeline.length<2||!viewport||!h)return;let desired=Math.max(viewport,timeline.length*12+96);space.style.width=desired+'px';canvas.width=desired*dpr;canvas.height=h*dpr;canvas.style.width=desired+'px';canvas.style.height=h+'px';let ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,desired,h);let pad={l:48,r:16,t:18,b:24},cw=desired-pad.l-pad.r,ch=h-pad.t-pad.b,highs=timeline.map(p=>p.high),lows=timeline.map(p=>p.low),max=Math.max(...highs),min=Math.min(...lows),spread=max-min||1;ctx.strokeStyle='#223049';ctx.lineWidth=1;ctx.font='12px Inter,Arial';ctx.fillStyle='#8c9ab4';for(let i=0;i<5;i++){let yy=pad.t+ch*i/4;ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(desired-pad.r,yy);ctx.stroke();ctx.fillText(money(max-spread*i/4),6,yy+4)}let x=i=>pad.l+cw*i/(timeline.length-1),y=v=>pad.t+(max-v)/spread*ch,barW=Math.max(5,Math.min(10,cw/timeline.length*.55));timeline.forEach((p,i)=>{let xx=x(i),green=p.close>=p.open;ctx.strokeStyle=green?'#00c076':'#ff5b6e';ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(xx,y(p.high));ctx.lineTo(xx,y(p.low));ctx.stroke();let top=y(Math.max(p.open,p.close)),bottom=y(Math.min(p.open,p.close));ctx.fillRect(xx-barW/2,top,barW,Math.max(2,bottom-top))});scroll.scrollLeft=scroll.scrollWidth}
+async function refresh(){let[me,balance,banks,stocks,holds,orders,executions]=await Promise.all([api('/users/me'),api('/cash/balance'),api('/banks'),api('/securities'),api('/holdings'),api('/orders'),api('/executions')]);securities=stocks;holdingsCache=holds;ordersCache=orders;executionsCache=executions;$('who').textContent='Signed in as '+me.name;$('balance').textContent='Cash balance: '+money(balance.balance);$('banks').innerHTML=banks.length?'<p class="sub">Linked: '+banks.map(b=>b.bank_name+' ••••'+b.account_no.slice(-4)).join('<br>')+'</p>':'<p class="sub">Link a bank account to complete setup.</p>';$('security').innerHTML=stocks.map(s=>`<option value="${s.security_id}" data-price="${s.last_price}">${s.symbol} - ${company(s)} - ${money(s.last_price)}</option>`).join('');$('orders').innerHTML=orders.slice(0,8).map(o=>`<tr><td class="${o.order_type==='BUY'?'up':'down'}">${o.order_type} ${symbol(o.security_id)}</td><td>${o.quantity}</td><td>${o.status}</td></tr>`).join('')||'<tr><td colspan="3">No orders yet</td></tr>';renderTicker();renderHoldings();renderExecutions();selectedId=selectedId||stocks[0]?.security_id;selectStock(selectedId)}
+function showPage(page){currentPage=page;$('dashboard').classList.toggle('hidden',page!=='trade');$('fundsPage').classList.toggle('hidden',page!=='funds');$('executionsPage').classList.toggle('hidden',page!=='executions');$('tradePageBtn').classList.toggle('active',page==='trade');$('fundsPageBtn').classList.toggle('active',page==='funds');$('executionsPageBtn').classList.toggle('active',page==='executions');if(page==='trade')setTimeout(renderChart,0);if(page==='executions')renderExecutions()}
+function showApp(){$('access').classList.add('hidden');$('searchStrip').classList.remove('hidden');showPage(currentPage);refresh().catch(e=>notice(e.message))}
+function logout(){localStorage.removeItem('token');token='';location.reload()}
 $('register').onsubmit=async e=>{e.preventDefault();try{await api('/auth/register',{method:'POST',body:Object.fromEntries(new FormData(e.target))});notice('Account created. You can sign in now.',true);e.target.reset()}catch(x){notice(x.message)}};
 $('login').onsubmit=async e=>{e.preventDefault();let d=Object.fromEntries(new FormData(e.target));try{let body=new URLSearchParams({username:d.email,password:d.password});let r=await fetch('/auth/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body});if(!r.ok)throw Error((await r.json()).detail);token=(await r.json()).access_token;localStorage.token=token;showApp()}catch(x){notice(x.message)}};
 $('bank').onsubmit=async e=>{e.preventDefault();try{await api('/banks',{method:'POST',body:Object.fromEntries(new FormData(e.target))});notice('Bank account linked.',true);e.target.reset();refresh()}catch(x){notice(x.message)}};
 $('deposit').onsubmit=async e=>{e.preventDefault();try{await api('/cash/deposit',{method:'POST',body:Object.fromEntries(new FormData(e.target))});notice('Paper funds added.',true);e.target.reset();refresh()}catch(x){notice(x.message)}};
-$('security').onchange=e=>{$('price').value=e.target.selectedOptions[0].dataset.price};
+$('security').onchange=e=>selectStock(Number(e.target.value));
+$('stockSearch').oninput=renderSearchResults;
+$('stockSearch').onkeydown=e=>{if(e.key!=='Enter')return;let first=document.querySelector('.search-result');if(first){e.preventDefault();first.click()}};
+$('tradePageBtn').onclick=()=>showPage('trade');
+$('fundsPageBtn').onclick=()=>showPage('funds');
+$('executionsPageBtn').onclick=()=>showPage('executions');
+$('execFrom').onchange=renderExecutions;
+$('execTo').onchange=renderExecutions;
+$('execSort').onchange=renderExecutions;
+$('clearExecFilters').onclick=()=>{$('execFrom').value='';$('execTo').value='';$('execSort').value='desc';renderExecutions()};
+$('buyBtn').onclick=()=>{$('orderType').value='BUY';$('buyBtn').classList.add('active');$('sellBtn').classList.remove('active')};
+$('sellBtn').onclick=()=>{$('orderType').value='SELL';$('sellBtn').classList.add('active');$('buyBtn').classList.remove('active')};
 $('trade').onsubmit=async e=>{e.preventDefault();try{let order=await api('/orders',{method:'POST',body:Object.fromEntries(new FormData(e.target))});let execution=await api('/executions/order/'+order.order_id,{method:'POST'});await api('/settlements/'+execution.execution_id,{method:'POST'});notice('Trade settled successfully.',true);refresh()}catch(x){notice(x.message)}};
+$('rangeButtons').onclick=e=>{if(e.target.tagName!=='BUTTON')return;activeDays=Number(e.target.dataset.days);document.querySelectorAll('#rangeButtons button').forEach(b=>b.classList.toggle('active',b===e.target));loadTimeline().catch(x=>notice(x.message))};
+window.addEventListener('resize',()=>renderChart());
 if(token)showApp();
-</script></body></html>
+</script>
+</body>
+</html>
