@@ -1,4 +1,4 @@
-# NSE Trading Demo
+# Trading Demo App
 
 This is a paper-trading FastAPI application with a TradingView-inspired NSE dashboard. It creates a local SQLite database, seeds Indian stock symbols on first start, and includes searchable watchlists, canvas price charts, OHLC timeline data, holdings, orders, and paper-fund flows. No live exchange data or real bank payments are used.
 
